@@ -1,0 +1,24 @@
+{
+    "name": "ralfhortt/wp-settings",
+    "description": "A helper package for working with the WordPress Settings",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ralf Hortt",
+            "email": "mail@ralfhortt.dev"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "RalfHortt\\Settings\\": "src/"
+        }
+    },
+    "scripts": {
+        "phpstan": "phpstan analyse --memory-limit=1G"
+    },
+    "require-dev": {
+        "php-stubs/wordpress-stubs": "^6.9",
+        "phpstan/phpstan": "^2.1",
+        "szepeviktor/phpstan-wordpress": "^2.0"
+    }
+}
