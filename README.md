@@ -56,6 +56,35 @@ use RalfHortt\Settings\SettingsPage;
     ->register();
 ```
 
+#### Multiple Panel Tabs On One Page
+
+When you register more than one panel on the same page, the page renders panel tabs automatically.
+
+```php
+<?php
+use RalfHortt\Settings\SettingsPage;
+
+(new SettingsPage)
+    ->page('Theme Configuration')
+    ->subpageUnder('options-general.php')
+    ->panel('Design')
+        ->section('Colors')
+            ->color('primary-color', 'Primary Color')
+    ->panel('Content')
+        ->section('Homepage')
+            ->text('hero-title', 'Hero Title')
+    ->panel('Integrations')
+        ->section('API')
+            ->url('api-endpoint', 'API Endpoint')
+    ->register();
+```
+
+Notes:
+
+- Panels become tabs only when at least two panels exist.
+- A panel can contain multiple sections.
+- Section order follows the order you define in your fluent chain.
+
 #### Top-Level Menu Page
 
 ```php

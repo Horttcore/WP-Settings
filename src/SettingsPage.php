@@ -523,14 +523,171 @@ class SettingsPage
      */
     public function renderPage(): void
     {
+        $panelGroups = $this->getRenderablePanelGroups();
+
         echo '<div class="wrap">';
         echo '<h1>' . \esc_html($this->pageTitle) . '</h1>';
         echo '<form action="options.php" method="post">';
         \settings_fields($this->menuSlug);
-        \do_settings_sections($this->menuSlug);
+
+        if (\count($panelGroups) > 1) {
+            $this->renderTabbedPanelGroups($panelGroups);
+            $this->renderTabbedPanelAssets();
+        } else {
+            $this->renderLinearPanelGroups($panelGroups);
+        }
+
         \submit_button();
         echo '</form>';
         echo '</div>';
+    }
+
+    /**
+     * Build panel groups for rendering.
+     *
+     * @return array<string, array{title: string, description: string, sections: array<int, string>}>
+     */
+    protected function getRenderablePanelGroups(): array
+    {
+        /** @var array<string, array{title: string, description: string, sections: array<int, string>}> $groups */
+        $groups = [];
+
+        foreach ($this->panels as $panelId => $panel) {
+            $groups[$panelId] = [
+                'title' => (string) $panel['title'],
+                'description' => (string) $panel['description'],
+                'sections' => [],
+            ];
+        }
+
+        foreach ($this->sections as $sectionId => $section) {
+            $panelId = (string) $section['panel'];
+
+            if (!$panelId || !isset($groups[$panelId])) {
+                $panelId = '__default';
+
+                if (!isset($groups[$panelId])) {
+                    $groups[$panelId] = [
+                        'title' => 'General',
+                        'description' => '',
+                        'sections' => [],
+                    ];
+                }
+            }
+
+            $groups[$panelId]['sections'][] = $sectionId;
+        }
+
+        $groups = \array_filter($groups, static function (array $group): bool {
+            return !empty($group['sections']);
+        });
+
+        if (!$groups) {
+            return [];
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Render groups without tabs.
+     *
+     * @param array<string, array{title: string, description: string, sections: array<int, string>}> $panelGroups Groups.
+     *
+     * @return void
+     */
+    protected function renderLinearPanelGroups(array $panelGroups): void
+    {
+        if (!$panelGroups) {
+            \do_settings_sections($this->menuSlug);
+
+            return;
+        }
+
+        foreach ($panelGroups as $panelGroup) {
+            $this->renderSinglePanelGroup($panelGroup);
+        }
+    }
+
+    /**
+     * Render groups as tabbed panels.
+     *
+     * @param array<string, array{title: string, description: string, sections: array<int, string>}> $panelGroups Groups.
+     *
+     * @return void
+     */
+    protected function renderTabbedPanelGroups(array $panelGroups): void
+    {
+        echo '<div class="wp-settings-tab-group" data-wp-settings-tab-group="1">';
+        echo '<h2 class="nav-tab-wrapper">';
+
+        $firstPanelId = '';
+        foreach ($panelGroups as $panelId => $panelGroup) {
+            if ($firstPanelId === '') {
+                $firstPanelId = $panelId;
+            }
+
+            echo '<button type="button" class="nav-tab" data-wp-settings-tab="' . \esc_attr($panelId) . '">' . \esc_html($panelGroup['title']) . '</button>';
+        }
+
+        echo '</h2>';
+        echo '<div class="wp-settings-tab-panels">';
+
+        foreach ($panelGroups as $panelId => $panelGroup) {
+            $isActive = $panelId === $firstPanelId;
+
+            echo '<div class="wp-settings-tab-panel" data-wp-settings-panel="' . \esc_attr($panelId) . '"' . ($isActive ? '' : ' hidden') . '>';
+            $this->renderSinglePanelGroup($panelGroup);
+            echo '</div>';
+        }
+
+        echo '</div>';
+        echo '</div>';
+    }
+
+    /**
+     * Render one panel group with all contained sections.
+     *
+     * @param array{title: string, description: string, sections: array<int, string>} $panelGroup Panel group.
+     *
+     * @return void
+     */
+    protected function renderSinglePanelGroup(array $panelGroup): void
+    {
+        if ($panelGroup['description'] !== '') {
+            echo '<p>' . \esc_html($panelGroup['description']) . '</p>';
+        }
+
+        foreach ($panelGroup['sections'] as $sectionId) {
+            if (!isset($this->sections[$sectionId])) {
+                continue;
+            }
+
+            $section = $this->sections[$sectionId];
+
+            echo '<section class="wp-settings-section" id="section-' . \esc_attr($sectionId) . '">';
+            echo '<h2>' . \esc_html($section['title']) . '</h2>';
+
+            if ($section['description'] !== '') {
+                echo '<p>' . \esc_html($section['description']) . '</p>';
+            }
+
+            echo '<table class="form-table" role="presentation">';
+            \do_settings_fields($this->menuSlug, $sectionId);
+            echo '</table>';
+            echo '</section>';
+        }
+    }
+
+    /**
+     * Render CSS and JS for panel tabs.
+     *
+     * @return void
+     */
+    protected function renderTabbedPanelAssets(): void
+    {
+        echo '<style>.wp-settings-tab-group .wp-settings-tab-panel{margin-top:16px;}.wp-settings-tab-group .wp-settings-section + .wp-settings-section{margin-top:24px;}</style>';
+        echo '<script>(function(){var groups=document.querySelectorAll("[data-wp-settings-tab-group]");groups.forEach(function(group){if(group.dataset.wpSettingsTabsReady==="1"){return;}group.dataset.wpSettingsTabsReady="1";var tabs=group.querySelectorAll("[data-wp-settings-tab]");var panels=group.querySelectorAll("[data-wp-settings-panel]");if(!tabs.length||!panels.length){return;}var activate=function(panelId){tabs.forEach(function(tab){var active=tab.getAttribute("data-wp-settings-tab")===panelId;tab.classList.toggle("nav-tab-active",active);tab.setAttribute("aria-selected",active?"true":"false");tab.setAttribute("tabindex",active?"0":"-1");});panels.forEach(function(panel){var active=panel.getAttribute("data-wp-settings-panel")===panelId;panel.hidden=!active;});};tabs.forEach(function(tab){tab.addEventListener("click",function(event){event.preventDefault();activate(tab.getAttribute("data-wp-settings-tab")||"");});});activate(tabs[0].getAttribute("data-wp-settings-tab")||"");});})();</script>';
     }
 
     /**
